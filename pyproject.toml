@@ -9,6 +9,7 @@ dependencies = [
     "ibis-framework>=12.0.0",
     "marimo>=0.24.0",
     "numpy>=2.5.2",
+    "pandas>=3.0.5",
     "pyarrow>=25.0.1",
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
