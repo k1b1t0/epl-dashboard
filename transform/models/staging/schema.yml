@@ -63,3 +63,55 @@ models:
                   - APERTURA
                   - CHAMPIONSHIP_ROUND
                   - RELEGATION_ROUND
+
+  - name: stg_matches_referees
+    description: "Bang staging danh sach trong tai bat cac tran dau"
+    columns:
+      - name: referee_id
+        description: "Ma dinh danh trong tai"
+        tests:
+          - not_null
+      - name: referee_name
+        description: "Ten trong tai"
+        tests:
+          - not_null
+      - name: match_dlt_id
+        description: "Foreign key ket noi den bang matches (_dlt_id)"
+        tests:
+          - not_null
+
+  - name: stg_teams
+    description: "Bang staging thong tin cac doi bong EPL theo mua"
+    columns:
+      - name: team_id
+        description: "Ma dinh danh doi bong"
+        tests:
+          - not_null
+      - name: season
+        description: "Nam mua giai"
+        tests:
+          - not_null
+      - name: team_name
+        description: "Ten doi bong"
+        tests:
+          - not_null
+
+  - name: stg_teams_squad
+    description: "Bang staging danh sach cau thu thi dau cho cac doi bong theo mua"
+    columns:
+      - name: player_id
+        description: "Ma dinh danh cau thu"
+        tests:
+          - not_null
+      - name: team_id
+        description: "Ma dinh danh doi bong chu quan"
+        tests:
+          - not_null
+      - name: season
+        description: "Nam mua giai"
+        tests:
+          - not_null
+      - name: player_name
+        description: "Ten cau thu"
+        tests:
+          - not_null
