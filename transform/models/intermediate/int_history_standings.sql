@@ -100,7 +100,7 @@ ranked_standings as (
         goals_difference,
         points,
         dense_rank() over (
-            partition by season, utc_date
+            partition by season, played
             order by 
                 points desc, 
                 goals_difference desc, 
@@ -110,4 +110,4 @@ ranked_standings as (
 )
 
 select * from ranked_standings
-order by season desc, utc_date asc, rank asc
+order by season desc, played asc, rank asc

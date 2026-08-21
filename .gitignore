@@ -18,3 +18,5 @@ data/
 
 load/*ipynb
 load/.ipynb_checkpoints
+
+logs/

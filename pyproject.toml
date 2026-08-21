@@ -5,15 +5,21 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "dbt-core>=1.12.3",
+    "dbt-postgres>=1.11.0",
     "dlt[duckdb,hub]>=1.29.1",
     "ibis-framework>=12.0.0",
     "marimo>=0.24.0",
     "numpy>=2.5.2",
     "pandas>=3.0.5",
+    "plotly>=6.9.0",
+    "psycopg2-binary>=2.9.12",
     "pyarrow>=25.0.1",
     "pyspark>=4.2.0",
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
+    "sqlalchemy>=2.0.52",
+    "streamlit>=1.62.0",
 ]
 
 [dependency-groups]
