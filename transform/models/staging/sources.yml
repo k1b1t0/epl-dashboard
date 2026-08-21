@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: epl_postgres
+    database: epl
+    schema: public
+    description: "Du lieu tho Postgres duoc nap tu PySpark ETL Pipeline"
+    tables:
+      - name: raw_matches
+        description: "Du lieu tho cac tran dau EPL"
+      - name: raw_matches_referees
+        description: "Du lieu tho trong tai tran dau"
+      - name: raw_teams
+        description: "Du lieu tho cac doi bong EPL"
+      - name: raw_teams_squad
+        description: "Du lieu tho danh sach cau thu theo mua"
