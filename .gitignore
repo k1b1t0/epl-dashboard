@@ -15,3 +15,6 @@ wheels/
 test/
 
 data/
+
+load/*ipynb
+load/.ipynb_checkpoints
