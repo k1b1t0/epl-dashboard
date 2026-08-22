@@ -12,6 +12,10 @@ tasks:
     type: io.kestra.plugin.scripts.shell.Commands
     taskRunner:
       type: io.kestra.plugin.core.runner.Process
+    retry:
+      type: exponential
+      maxAttempt: 3
+      interval: PT10S
     commands:
       - command -v uv >/dev/null 2>&1 || (curl -LsSf https://astral.sh/uv/install.sh | sh)
       - export PATH="$HOME/.local/bin:$PATH"
