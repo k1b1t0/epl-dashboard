@@ -15,7 +15,7 @@ RAW_DIR = BASE_DIR / "data" / "raw"
 SEASONS = [2023, 2024, 2025, 2026]
 
 # Cau hinh Postgres Connection
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "pgdatabase")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "epl")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "root")

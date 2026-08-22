@@ -1,0 +1,56 @@
+id: epl_pipeline
+namespace: football
+description: "EPL End-to-End Data Pipeline: Setup -> Ingestion -> Load (PySpar) -> Transform (dbt)"
+
+triggers:
+  - id: daily_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 6 * * *"
+
+tasks:
+  - id: 0_setup_environment
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - command -v uv >/dev/null 2>&1 || (curl -LsSf https://astral.sh/uv/install.sh | sh)
+      - export PATH="$HOME/.local/bin:$PATH"
+      - cd /app/epl-dashboard
+      - uv sync
+
+  - id: 1_ingestion
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - export PATH="$HOME/.local/bin:$PATH"
+      - cd /app/epl-dashboard
+      - uv run python -m ingestion.rest_api_football_pipeline
+
+  - id: 2_load
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - export PATH="$HOME/.local/bin:$PATH"
+      - cd /app/epl-dashboard
+      - uv run python -m load.parquet_to_postgres_pipeline
+
+  - id: 3_transform
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - export PATH="$HOME/.local/bin:$PATH"
+      - export POSTGRES_HOST=pgdatabase
+      - cd /app/epl-dashboard/transform
+      - uv run dbt run --profiles-dir .
+      - uv run dbt test --profiles-dir .
+
+errors:
+  - id: notify_failure
+    type: io.kestra.plugin.scripts.shell.Commands
+    taskRunner:
+      type: io.kestra.plugin.core.runner.Process
+    commands:
+      - echo "Pipeline failed! Sending failure notification..."

@@ -1,0 +1,12 @@
+epl_transform:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'pgdatabase') }}"
+      user: "{{ env_var('POSTGRES_USER', 'root') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD', 'root') }}"
+      port: 5432
+      dbname: "{{ env_var('POSTGRES_DB', 'epl') }}"
+      schema: public
+      threads: 4
