@@ -1,7 +1,6 @@
 with finished_matches as (
     select * 
     from {{ ref('int_team_matches') }}
-    where match_status = 'FINISHED'
 ),
 
 -- Tong hop chi so theo tung vong dau (matchday) va doi bong

@@ -3,7 +3,7 @@ epl_transform:
   outputs:
     dev:
       type: postgres
-      host: "{{ env_var('POSTGRES_HOST', 'pgdatabase') }}"
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
       user: "{{ env_var('POSTGRES_USER', 'root') }}"
       pass: "{{ env_var('POSTGRES_PASSWORD', 'root') }}"
       port: 5432

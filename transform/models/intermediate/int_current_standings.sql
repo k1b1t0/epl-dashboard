@@ -4,6 +4,11 @@ with finished_matches as (
     where match_status = 'FINISHED'
 ),
 
+team_season as (
+    select team_id, season
+    from {{ ref('stg_teams') }}
+),
+
 aggregated as (
     select
         team_id,
@@ -18,6 +23,24 @@ aggregated as (
         sum(points_earned) as points
     from finished_matches
     group by season, team_id
+),
+
+add_null_teams as (
+    select
+        ts.team_id,
+        ts.season,
+        coalesce(a.played, 0) as played,
+        coalesce(a.win, 0) as win,
+        coalesce(a.lose, 0) as lose,
+        coalesce(a.draw, 0) as draw,
+        coalesce(a.goals_scored, 0) as goals_scored,
+        coalesce(a.goals_conceded, 0) as goals_conceded,
+        coalesce(a.goals_difference, 0) as goals_difference,
+        coalesce(a.points, 0) as points
+    from team_season ts
+    left join aggregated a
+        on ts.team_id = a.team_id 
+       and ts.season = a.season
 ),
 
 ranked as (
@@ -39,7 +62,7 @@ ranked as (
                 goals_difference desc, 
                 goals_scored desc
         ) as rank
-    from aggregated
+    from add_null_teams
 )
 
 select * from ranked
