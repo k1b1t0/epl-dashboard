@@ -1,6 +1,7 @@
 with finished_matches as (
     select * 
     from {{ ref('int_team_matches') }}
+    where match_status = 'FINISHED'
 ),
 
 -- Tong hop chi so theo tung vong dau (matchday) va doi bong
@@ -98,7 +99,7 @@ ranked_standings as (
         goals_conceded,
         goals_difference,
         points,
-        dense_rank() over (
+        rank() over (
             partition by season, matchday 
             order by 
                 points desc, 

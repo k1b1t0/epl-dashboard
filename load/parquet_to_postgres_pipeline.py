@@ -15,7 +15,7 @@ RAW_DIR = BASE_DIR / "data" / "raw"
 SEASONS = [2023, 2024, 2025, 2026]
 
 # Cau hinh Postgres Connection
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "pgdatabase")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "epl")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "root")
@@ -42,6 +42,16 @@ def execute_jdbc_sql(spark: SparkSession, sql: str) -> None:
     except Exception:
         pass
 
+def read_from_postgres(spark: SparkSession, sql: str):
+    return spark.read \
+        .format("jdbc") \
+        .option("url", POSTGRES_URL) \
+        .option("dbtable", sql) \
+        .option("user", POSTGRES_USER) \
+        .option("password", POSTGRES_PASSWORD) \
+        .option("driver", POSTGRES_DRIVER) \
+        .load()
+
 def write_to_postgres(df, table_name: str, mode: str = "append") -> None:
     df.write \
         .format("jdbc") \
@@ -65,42 +75,55 @@ def process_pipeline(spark: SparkSession):
 
         # 1. Matches & Referees
         matches_full_file = season_dir / "matches_full.parquet"
+        target_matches = None
+
         if matches_full_file.exists():
-            print(f"Season {season}: Da chot matches_full.parquet, bo qua matches.")
+            print(f"Season {season}: Da chot matches_full.parquet")
+            check_matches_existed = read_from_postgres(
+                spark, sql=f"(SELECT COUNT(*) FROM raw_matches WHERE season = {season}) as t"
+            )
+            count_val = check_matches_existed.first()[0]
+            if count_val == 0:
+                print(f"Season {season}: Postgres trong -> Nap tu matches_full.parquet...")
+                target_matches = spark.read.parquet(str(matches_full_file))
         else:
             match_files = [str(f) for f in season_dir.glob("matches_*.parquet")
                            if "referees" not in f.name and "full" not in f.name]
             if match_files:
                 print(f"Season {season}: Process {len(match_files)} matches snapshot files...")
                 raw_matches = spark.read.parquet(*match_files)
-
-                match_window = Window.partitionBy("id").orderBy(col("last_updated").desc_nulls_last(), col("_dlt_load_id").desc_nulls_last())
-                dedup_matches = raw_matches.withColumn("rn", row_number().over(match_window)).filter(col("rn") == 1).drop("rn")
-
-                referee_files = [str(f) for f in season_dir.glob("matches__referees_*.parquet")]
-                dedup_referees = None
-                if referee_files:
-                    raw_referees = spark.read.parquet(*referee_files)
-                    dedup_referees = raw_referees.join(
-                        dedup_matches.select("_dlt_id"),
-                        raw_referees._dlt_parent_id == dedup_matches._dlt_id,
-                        "inner"
-                    ).select(raw_referees["*"]).dropDuplicates(["id", "_dlt_parent_id"])
-
-                # Delete -> Append cho matches va referees
-                execute_jdbc_sql(spark, f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
-                execute_jdbc_sql(spark, f"DELETE FROM raw_matches WHERE season = {season}")
-
-                write_to_postgres(dedup_matches, "raw_matches", mode="append")
-                if dedup_referees:
-                    write_to_postgres(dedup_referees, "raw_matches_referees", mode="append")
+                match_window = Window.partitionBy("id").orderBy(
+                    col("last_updated").desc_nulls_last(), 
+                    col("_dlt_load_id").desc_nulls_last()
+                )
+                target_matches = raw_matches.withColumn("rn", row_number().over(match_window)).filter(col("rn") == 1).drop("rn")
 
                 # Chot matches_full neu tat ca tran da FINISHED
-                total = dedup_matches.count()
-                unfinished = dedup_matches.filter(col("status") != "FINISHED").count()
+                total = target_matches.count()
+                unfinished = target_matches.filter(col("status") != "FINISHED").count()
                 if total > 0 and unfinished == 0:
                     print(f"Season {season}: Tat ca {total} tran FINISHED -> Chot matches_full.parquet")
-                    dedup_matches.coalesce(1).write.mode("overwrite").parquet(str(matches_full_file))
+                    target_matches.coalesce(1).write.mode("overwrite").parquet(str(matches_full_file))
+
+        # Thuc hien Delete -> Append dung 1 noi duy nhat neu co target_matches
+        if target_matches is not None:
+            referee_files = [str(f) for f in season_dir.glob("matches__referees_*.parquet")]
+            dedup_referees = None
+            if referee_files:
+                raw_referees = spark.read.parquet(*referee_files)
+                dedup_referees = raw_referees.join(
+                    target_matches.select("_dlt_id"),
+                    raw_referees._dlt_parent_id == target_matches._dlt_id,
+                    "inner"
+                ).select(raw_referees["*"]).dropDuplicates(["id", "_dlt_parent_id"])
+
+            # Delete -> Append cho matches va referees
+            execute_jdbc_sql(spark, f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
+            execute_jdbc_sql(spark, f"DELETE FROM raw_matches WHERE season = {season}")
+
+            write_to_postgres(target_matches, "raw_matches", mode="append")
+            if dedup_referees:
+                write_to_postgres(dedup_referees, "raw_matches_referees", mode="append")
 
         # 2. Teams
         team_files = [str(f) for f in season_dir.glob("teams_*.parquet") if "squad" not in f.name]

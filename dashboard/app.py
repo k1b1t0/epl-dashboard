@@ -21,64 +21,118 @@ from dashboard.database import (
 )
 from dashboard.utils import get_team_color_map
 
-st.set_page_config(page_title="EPL Analytics Dashboard", page_icon="⚽", layout="wide")
-st.title("⚽ Premier League (EPL) Data Analytics Dashboard")
-st.markdown("---")
+# ==========================================
+# PAGE CONFIG
+# ==========================================
+st.set_page_config(
+    page_title="EPL Dashboard", 
+    page_icon="⚽", 
+    layout="wide"
+)
 
+# Load Seasons
 seasons = load_seasons()
 if not seasons:
-    st.error("Chưa kết nối được CSDL PostgreSQL!")
+    st.error("Failed to connect to PostgreSQL Database! Please verify containers are running.")
+    st.stop()
+
+# ==========================================
+# TOP HEADER & GLOBAL SEASON SELECTOR
+# ==========================================
+title_col, season_col = st.columns([3, 1])
+
+with title_col:
+    st.title("⚽ EPL Dashboard")
+
+with season_col:
+    selected_season = st.selectbox("Season:", seasons, index=0, key="global_season")
+
+season_display = f"{selected_season}/{selected_season + 1}"
+st.markdown("---")
+
+# Fetch Season Current Standings
+df_current = load_current_standings(selected_season)
+if df_current.empty:
+    st.warning(f"No standings data found for season {selected_season}.")
     st.stop()
 
 col_left, col_right = st.columns([1, 2], gap="large")
 
-# --- LEFT COLUMN: Pie Chart ---
+# ==========================================
+# LEFT COLUMN: TEAM PERFORMANCE OVERVIEW
+# ==========================================
 with col_left:
-    st.subheader("📊 Tỷ Lệ Thắng/Hòa/Thua")
-    selected_season_left = st.selectbox("Mùa giải (Trái):", seasons, key="s_left")
-    df_current = load_current_standings(selected_season_left)
-    selected_team = st.selectbox("Chọn đội bóng:", df_current['team_name'].tolist(), key="t_left")
+    st.subheader("📊 Team Performance Overview")
+    
+    # Team dropdown with formatted label (TLA - Full Name)
+    teams_dict = {row['team_name']: f"{row['tla']} - {row['team_name']}" for _, row in df_current.iterrows()}
+    available_teams = list(teams_dict.keys())
+    
+    selected_team = st.selectbox(
+        "Select Team:", 
+        available_teams, 
+        format_func=lambda x: teams_dict[x],
+        index=0, 
+        key="t_select"
+    )
     
     team_info = df_current[df_current['team_name'] == selected_team].iloc[0]
     
-    c1, c2 = st.columns([1, 3])
-    with c1:
-        if pd.notnull(team_info['crest']) and str(team_info['crest']).startswith("http"):
-            st.image(team_info['crest'], width=56)
-    with c2:
-        st.markdown(f"### {team_info['team_name']} ({team_info['tla']})")
-        st.caption(f"Hạng: #{team_info['rank']} | Điểm: {team_info['points']} | Hiệu số: {team_info['goals_difference']}")
+    # 100% Perfectly Centered Flexbox Header (Logo + Team Name + Stats)
+    crest_url = team_info['crest'] if pd.notnull(team_info['crest']) and str(team_info['crest']).startswith("http") else ""
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; gap: 16px; margin-top: 12px; margin-bottom: 20px; background: rgba(255,255,255,0.04); padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+        <img src="{crest_url}" style="width: 56px; height: 56px; object-fit: contain;" alt="crest" />
+        <div>
+            <h3 style="margin: 0; padding: 0; font-size: 22px; font-weight: 700; line-height: 1.2;">{team_info['team_name']}</h3>
+            <div style="font-size: 13px; opacity: 0.85; margin-top: 4px;">
+                <b>Rank:</b> #{team_info['rank']} &nbsp;|&nbsp; <b>Points:</b> {team_info['points']} &nbsp;|&nbsp; <b>GD:</b> {team_info['goals_difference']}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     pie_df = pd.DataFrame({
-        'Kết quả': ['Thắng (Win)', 'Hòa (Draw)', 'Thua (Loss)'],
-        'Số trận': [int(team_info['win']), int(team_info['draw']), int(team_info['lose'])]
+        'Outcome': ['Win', 'Draw', 'Loss'],
+        'Matches': [int(team_info['win']), int(team_info['draw']), int(team_info['lose'])]
     })
+    
     fig_pie = px.pie(
-        pie_df, values='Số trận', names='Kết quả', color='Kết quả',
-        color_discrete_map={'Thắng (Win)': '#2ca02c', 'Hòa (Draw)': '#ff7f0e', 'Thua (Loss)': '#d62728'},
-        hole=0.45, title=f"Kết quả {team_info['team_name']} (Mùa {selected_season_left})"
+        pie_df, 
+        values='Matches', 
+        names='Outcome', 
+        color='Outcome',
+        color_discrete_map={'Win': '#2ca02c', 'Draw': '#ff7f0e', 'Loss': '#d62728'},
+        hole=0.4, 
+        title=f"Result Breakdown: {team_info['team_name']}"
     )
+    fig_pie.update_traces(textinfo='value+percent')
     st.plotly_chart(fig_pie, use_container_width=True)
 
-# --- RIGHT COLUMN: Line Chart ---
+# ==========================================
+# RIGHT COLUMN: COMPARATIVE TRENDS (LINE CHART)
+# ==========================================
 with col_right:
-    st.subheader("📈 So Sánh Phong Độ Các Đội Bóng")
-    c1, c2, c3 = st.columns(3)
+    st.subheader("📈 Team Trend Comparisons")
+    c1, c2 = st.columns(2)
     with c1:
-        selected_season_right = st.selectbox("Mùa giải (Phải):", seasons, key="s_right")
+        trend_mode = st.radio("Timeline:", ["By Matchday", "By Games Played"], key="trend_mode")
     with c2:
-        mode = st.radio("Chế độ:", ["Theo Vòng Đấu (Matchday)", "Theo Số Trận Đã Đá (Played)"], key="m_right")
-    with c3:
-        metric = st.selectbox("Chỉ số:", ["points", "rank", "goals_scored", "goals_conceded", "goals_difference"], key="met_right")
+        metric = st.selectbox(
+            "Metric:", 
+            ["points", "rank", "goals_scored", "goals_conceded", "goals_difference"], 
+            index=0,
+            key="trend_metric"
+        )
 
-    df_line = load_matchday_standings(selected_season_right) if mode == "Theo Vòng Đấu (Matchday)" else load_history_standings(selected_season_right)
-    x_col = "matchday" if mode == "Theo Vòng Đấu (Matchday)" else "played"
+    df_line = load_matchday_standings(selected_season) if trend_mode == "By Matchday" else load_history_standings(selected_season)
+    x_col = "matchday" if trend_mode == "By Matchday" else "played"
     
-    available_teams = sorted(df_line['team_name'].unique())
-    color_map = get_team_color_map(available_teams)
+    all_teams = sorted(df_line['team_name'].unique())
+    color_map = get_team_color_map(all_teams)
     
-    select_all = st.checkbox("Chọn tất cả các đội bóng", value=True, key="sel_all")
-    selected_teams = available_teams if select_all else st.multiselect("Chọn đội bóng:", available_teams, default=available_teams[:5], key="sel_teams")
+    select_all = st.checkbox("Compare All Teams", value=True, key="sel_all_cb")
+    selected_teams = all_teams if select_all else st.multiselect("Select Teams:", all_teams, default=all_teams[:5], key="sel_teams_ms")
 
     if selected_teams:
         df_sub = df_line[df_line['team_name'].isin(selected_teams)].copy()
@@ -86,11 +140,85 @@ with col_right:
         sorted_teams = latest_data.sort_values(by=metric, ascending=(metric == "rank"))['team_name'].tolist()
 
         fig_line = px.line(
-            df_sub, x=x_col, y=metric, color='team_name', color_discrete_map=color_map,
-            category_orders={'team_name': sorted_teams}, markers=True,
-            title=f"Biến động {metric.upper()} - Mùa {selected_season_right}"
+            df_sub, 
+            x=x_col, 
+            y=metric, 
+            color='team_name', 
+            color_discrete_map=color_map,
+            category_orders={'team_name': sorted_teams}, 
+            markers=True,
+            title=f"Season Progression: {metric.replace('_', ' ').title()}"
         )
         if metric == "rank":
-            fig_line.update_yaxes(autorange="reversed", dtick=1, title="Thứ hạng (Hạng 1 ở trên)")
+            fig_line.update_yaxes(autorange="reversed", dtick=1, title="Rank (Rank #1 at Top)")
         
         st.plotly_chart(fig_line, use_container_width=True)
+
+# ==========================================
+# BOTTOM SECTION: STANDINGS TABLE & FILTERS
+# ==========================================
+st.markdown("---")
+st.subheader("🏆 Standings Table")
+
+# Standings Filters Placed Directly Above the Table
+f_col1, f_col2, f_col3 = st.columns([1, 1, 2])
+with f_col1:
+    view_mode = st.radio(
+        "View Mode:", 
+        ["Current Standings", "By Matchday", "By Games Played"], 
+        key="table_viewmode"
+    )
+with f_col2:
+    selected_number = 1
+    if view_mode == "By Matchday":
+        selected_number = st.slider("Matchday:", 1, 38, 1, key="tb_md_slider")
+    elif view_mode == "By Games Played":
+        selected_number = st.slider("Games Played:", 1, 38, 1, key="tb_pl_slider")
+with f_col3:
+    if view_mode == "Current Standings":
+        st.caption(f"Showing latest overall standings for Season {season_display}")
+    else:
+        st.caption(f"Showing standings snapshot at step #{selected_number}")
+
+# Fetch Standings Data
+if view_mode == "Current Standings":
+    df_standings = df_current.copy()
+elif view_mode == "By Matchday":
+    df_standings = load_matchday_standings(selected_season, selected_number)
+else:
+    df_standings = load_history_standings(selected_season, selected_number)
+
+if not df_standings.empty:
+    st.dataframe(
+        df_standings, 
+        use_container_width=True, 
+        hide_index=True,
+        column_order=[
+            "rank", 
+            "crest", 
+            "team_name", 
+            "played", 
+            "points", 
+            "goals_difference", 
+            "goals_scored", 
+            "goals_conceded", 
+            "win", 
+            "draw", 
+            "lose"
+        ],
+        column_config={
+            "rank": st.column_config.NumberColumn("Position", format="%d"),
+            "crest": st.column_config.ImageColumn("Club"),
+            "team_name": st.column_config.TextColumn("Team"),
+            "played": st.column_config.NumberColumn("Played", format="%d"),
+            "points": st.column_config.NumberColumn("Points 💥", format="%d", help="Total Earned Points"),
+            "goals_difference": st.column_config.NumberColumn("GD", format="%+d"),
+            "goals_scored": st.column_config.NumberColumn("GF", format="%d"),
+            "goals_conceded": st.column_config.NumberColumn("GA", format="%d"),
+            "win": st.column_config.NumberColumn("W", format="%d"),
+            "draw": st.column_config.NumberColumn("D", format="%d"),
+            "lose": st.column_config.NumberColumn("L", format="%d")
+        }
+    )
+else:
+    st.warning("No standings data available for the selected filters.")

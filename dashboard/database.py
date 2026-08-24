@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_HOST = "localhost"
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "epl")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "root")
@@ -35,11 +35,17 @@ def load_current_standings(season: int) -> pd.DataFrame:
     return pd.read_sql(query, engine)
 
 @st.cache_data(ttl=60)
-def load_matchday_standings(season: int) -> pd.DataFrame:
-    query = f"SELECT * FROM public.fct_matchday_standings WHERE season = {season} ORDER BY matchday ASC, rank ASC;"
+def load_matchday_standings(season: int, matchday: int = None) -> pd.DataFrame:
+    if matchday is not None:
+        query = f"SELECT * FROM public.fct_matchday_standings WHERE season = {season} AND matchday = {matchday} ORDER BY rank ASC;"
+    else:
+        query = f"SELECT * FROM public.fct_matchday_standings WHERE season = {season} ORDER BY matchday ASC, rank ASC;"
     return pd.read_sql(query, engine)
 
 @st.cache_data(ttl=60)
-def load_history_standings(season: int) -> pd.DataFrame:
-    query = f"SELECT * FROM public.fct_history_standings WHERE season = {season} ORDER BY played ASC, rank ASC;"
+def load_history_standings(season: int, played: int = None) -> pd.DataFrame:
+    if played is not None:
+        query = f"SELECT * FROM public.fct_history_standings WHERE season = {season} AND played = {played} ORDER BY rank ASC;"
+    else:
+        query = f"SELECT * FROM public.fct_history_standings WHERE season = {season} ORDER BY played ASC, rank ASC;"
     return pd.read_sql(query, engine)

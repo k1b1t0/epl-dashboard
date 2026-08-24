@@ -99,7 +99,7 @@ ranked_standings as (
         goals_conceded,
         goals_difference,
         points,
-        dense_rank() over (
+        rank() over (
             partition by season, played
             order by 
                 points desc, 
