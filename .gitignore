@@ -20,4 +20,4 @@ load/*ipynb
 load/.ipynb_checkpoints
 
 logs/
-dashboard/
+temp*
