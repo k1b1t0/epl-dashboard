@@ -1,0 +1,43 @@
+name: EPL End-to-End Data Pipeline
+run-name: Triggered by ${{ github.actor }}
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    env:
+      FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python & UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Step 1 - Ingestion (REST API to Parquet Data Lake)
+        run: |
+          uv run python -m ingestion.rest_api_football_pipeline
+
+      - name: Step 2 - Load (PySpark Parquet to Postgres DWH)
+        run: |
+          uv run python -m load.parquet_to_postgres_pipeline
+
+      - name: Step 3 - Transform (dbt Run & Data Tests)
+        run: |
+          cd transform
+          uv run dbt run --profiles-dir .
+          uv run dbt test --profiles-dir .
