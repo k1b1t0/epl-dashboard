@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: epl_postgres
-    database: epl
+    database: "{{ env_var('POSTGRES_DB', 'epl') }}"
     schema: public
     description: "Du lieu tho Postgres duoc nap tu PySpark ETL Pipeline"
     tables:
