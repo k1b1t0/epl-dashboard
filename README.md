@@ -1,49 +1,55 @@
 # ⚽ English Premier League (EPL) End-to-End Data Pipeline & Dashboard
 
-Welcome to the **EPL End-to-End Data Engineering Project**! This project automates data extraction, storage, transformation, orchestration, and visualization of Premier League match and team statistics.
+This project automates data extraction, storage, transformation, orchestration, and visualization of Premier League team statistics.
+
+Try it [here](https://epl-stat.streamlit.app/)
 
 ---
 
 ## 🏗️ Architecture Overview
 
-```mermaid
-graph LR
-    API["Football-Data.org REST API"] -->|DLT| DataLake["Data Lake (Parquet Files)"]
-    DataLake -->|PySpark JDBC| DWH["PostgreSQL DWH (Raw Tables)"]
-    DWH -->|dbt Core| Marts["Star Schema (Dim & Fact Marts)"]
-    Marts -->|SQLAlchemy| Streamlit["Streamlit Analytics Dashboard"]
-    
-    Orchestration["Kestra Orchestrator"] -.->|Trigger Daily| API
-    Orchestration -.->|Trigger Daily| DataLake
-    Orchestration -.->|Trigger Daily| DWH
-```
+![overall diagram](assets/overall-architect.png)
 
 ---
 
 ## 📁 Repository Structure & Documentation
 
-Below is the modular breakdown of the project. Click on any module link to view its detailed documentation:
-
-- 📥 **[Ingestion Module](./ingestion/README.md)**: Automated data ingestion from REST API to local Parquet Data Lake using DLT.
-- ⚡ **[Load Module](./load/README.md)**: High-performance data loading and deduplication from Parquet into PostgreSQL using PySpark.
-- 🔄 **[Transform Module](./transform/README.md)**: Data modeling with dbt Core (Staging -> Intermediate -> Marts) and Data Quality testing.
-- 🎼 **[Orchestration Module](./orchestration/README.md)**: Workflow orchestration, scheduling, and error handling using Kestra.
-- 📊 **[Dashboard Module](./dashboard/README.md)**: Streamlit interactive analytics UI.
+- `ingestion/` Data ingestion module from REST API to local Parquet Data Lake using `dlt`
+- `load/` Data loading and deduplication from Parquet files into DWH (PostgreSQL) using PySpark
+- `transform/` Data modeling and data transforming using dbt (Staging -> Intermediate -> Marts), Data quality testing
+- `orchestration/` Kestra orchestration workflow
+- `dashboard/` Streamlit dashboard UI
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Local instalation
 
 ### 1. Prerequisites
-- Docker & Docker Compose
-- `uv` (Fast Python Package Manager)
+- Docker
+- `uv` (Package Manager)
 
-### 2. Launch Services
+### 2. Config environment (`.env.example`)
+```
+# Football API Token (Get free key from https://www.football-data.org/)
+FOOTBALL_DATA_TOKEN=your_football_data_token_here
+
+# PostgreSQL Database Connection Settings
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=epl
+POSTGRES_USER=root
+POSTGRES_PASSWORD=root
+```
+
+### 3. Launch Services
+- Includes PostgreSQL and Kestra containers
 ```bash
 docker compose up -d
 ```
 
-### 3. Run Pipeline via Kestra CLI / API
+### 4. Run Pipeline via Kestra CLI / API
+- Kestra UI on `localhost:8080 `
+- Or run via CLI
 ```bash
 curl -u "admin@kestra.io:Admin1234!" -X POST http://localhost:8080/api/v1/executions/football/epl_pipeline
 ```

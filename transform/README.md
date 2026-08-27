@@ -1,10 +1,10 @@
-# ⚽ EPL Data Transformation with dbt (epl_transform)
+# ⚽ Transform Module Documentation
 
-This project contains the **dbt (data build tool)** transformation layer for the English Premier League (EPL) Data Pipeline. It transforms raw ingestion data from PostgreSQL into a clean, normalized, and performant **Star Schema (Data Marts)** designed for analytical dashboards and Business Intelligence.
+This project contains the **dbt** transformation layer for the EPL data. It transforms raw ingestion data into a clean, normalized, and performant **Star Schema (Data Marts)** for dashboard.
 
 ---
 
-## 🏛️ Architecture & Data Lineage
+## 🏛️ Architecture
 
 The transformation follows standard dbt multi-layered architecture:
 
@@ -24,8 +24,8 @@ Sources (epl.public)
         │
         ▼
    [ 2. Intermediate Layer (Tables) ]
-   ├── int_team_matches       (Doubles matches into Home/Away team rows with primary key team_match_id)
-   ├── int_current_standings  (Aggregates overall season totals & ranks teams)
+   ├── int_team_matches       (Doubles matches into records for each team (Home/Away))
+   ├── int_current_standings  (Final or current standings for every seasons)
    ├── int_matchday_standings (Cumulative standings per season & matchday 1..38)
    └── int_history_standings  (Timeline cumulative standings partitioned by season & played count)
         │
@@ -43,30 +43,44 @@ Sources (epl.public)
 ## 📂 Project Structure & Models Overview
 
 ### 1. Staging Layer (`models/staging/`)
-- **`stg_matches.sql`**: Standardizes raw match results, explicitly casts timestamps, scorelines, and renames `status` to `match_status`.
-- **`stg_matches_referees.sql`**: Cleans referee assignment data per match.
-- **`stg_teams.sql`**: Normalizes club profile information (TLA, crest, address, venue, founded year).
-- **`stg_teams_squad.sql`**: Cleans player squad profiles, aliasing `date_of_birth` to `dob`.
+- 1-1 Mapping from raw source tables, change column names.
+- `stg_matches.sql`
+- `stg_matches_referees.sql`
+- `stg_teams.sql`
+- `stg_teams_squad.sql`
 
 ### 2. Intermediate Layer (`models/intermediate/`)
-- **`int_team_matches.sql`**: Pivots match records into two rows (Home perspective & Away perspective) with surrogate key `team_match_id`.
-- **`int_current_standings.sql`**: Aggregates points, wins, draws, losses, goal differences and calculates `dense_rank()` per season.
-- **`int_matchday_standings.sql`**: Uses window functions `SUM(...) OVER (PARTITION BY season, team_id ORDER BY matchday)` to calculate cumulative matchday standings ($1 \rightarrow 38$).
-- **`int_history_standings.sql`**: Calculates cumulative standings ordered by `utc_date` and ranks teams after completing $N$ games played (`PARTITION BY season, played`).
+- Using data from staging tables and perform heavy computation.
+- `int_team_matches.sql`
+- `int_current_standings.sql`
+- `int_matchday_standings.sql`
+- `int_history_standings.sql`
 
 ### 3. Data Marts Layer (`models/marts/`)
-- **`dim_teams.sql`**: Master team dimension table deduplicated by `team_id`.
-- **`fct_current_standings.sql`**: Latest season standings ready for dashboard KPIs.
-- **`fct_matchday_standings.sql`**: Traditional matchday standings for league table progression charts.
-- **`fct_history_standings.sql`**: Equal-games-played standings progression chart.
-- **`fct_team_matches.sql`**: Full match results joined with both Team and Opponent logos/metadata for head-to-head analysis.
+- Final result table following Star Model, ready for BI, data analyze and visualization.
+- `dim_teams.sql`
+- `fct_current_standings.sql`
+- `fct_matchday_standings.sql`
+- `fct_history_standings.sql`
+- `fct_team_matches.sql`
 
 ---
 
 ## 🛠️ Custom Macros (`macros/`)
+- `get_points_earned.sql`
+- `get_match_result.sql`
 
-- **`get_points_earned(goals_for, goals_against)`**: Returns `3` points for win, `1` for draw, `0` for loss.
-- **`get_match_result(goals_for, goals_against)`**: Returns `'WIN'`, `'DRAW'`, or `'LOST'`.
+---
+
+## 🧪 Data Quality Tests
+
+### 1. Custom Singular Tests (`tests/`)
+- `assert_finished_matches_have_scores.sql`
+- `assert_unfinished_matches_no_scores.sql`
+
+### 2. Generic Schema Tests (`models/staging/schema.yml`)
+- `unique`
+- `not_null`
 
 ---
 
@@ -74,6 +88,8 @@ Sources (epl.public)
 
 ### 1. Execute Transformation Pipeline
 ```bash
+cd transform/
+
 # Run all models across all layers
 uv run dbt run
 
@@ -85,11 +101,13 @@ uv run dbt run --select marts
 
 ### 2. Run Data Quality Tests
 ```bash
+cd transform/
 uv run dbt test
 ```
 
 ### 3. Generate & View Interactive Lineage Docs
 ```bash
+cd transform/
 uv run dbt docs generate
 uv run dbt docs serve
 ```

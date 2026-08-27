@@ -1,7 +1,7 @@
 # 📥 Ingestion Module Documentation
 
 ## 📌 Overview
-Briefly describe the purpose of the Ingestion module (e.g., fetching match fixtures, team metadata, and squad details from Football-Data.org API).
+This module extracts football data (EPL specified) from football-data, remove unnecessary and add necessary fields then save them to Data Lake (local Parquet files). 
 
 ---
 
@@ -19,6 +19,20 @@ Briefly describe the purpose of the Ingestion module (e.g., fetching match fixtu
 ---
 
 ## 📝 Usage / Manual Execution
+- Add football-data API token to `.env` (optional) 
+```
+FOOTBALL_DATA_TOKEN=...
+```
+- Command
 ```bash
 uv run python -m ingestion.rest_api_football_pipeline
 ```
+
+---
+
+## 🧠 Logic
+- Only parse if the season isn't finished (`matches_full` file doesn't exist)
+- Parse data from REST API
+- Remove unnecessary fields
+- Add `season` field
+- Write into parquet file in `data/raw/{season}/`

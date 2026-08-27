@@ -1,7 +1,8 @@
 # ⚡ Load Module Documentation
 
 ## 📌 Overview
-Briefly describe the purpose of the Load module (e.g., reading Parquet data from Data Lake, deduplicating records using Window Functions, and loading clean raw tables into PostgreSQL DWH).
+This module loads data from Data Lake (Parquet files) to DWH (PostgreSQL). It reads data from each season, then deduplicates the records and update the DWH.
+It also checks whether the season is finished (all 380 matches have `FINISHED` status) then create a `matches_full` file to finalize the season.
 
 ---
 
@@ -21,3 +22,15 @@ Briefly describe the purpose of the Load module (e.g., reading Parquet data from
 ```bash
 uv run python -m load.parquet_to_postgres_pipeline
 ```
+---
+
+## 🧠 Logic
+- Ignore the finished season
+- Read every .parquet files from a season then deduplicate by ID, only keep the newest record
+- If the season is over, then finalize a `matches_full` file
+
+## 🗄️ Target DWH Tables
+- `raw_matches`
+- `raw_matches_referees`
+- `raw_teams`
+- `raw_teams_squad`
