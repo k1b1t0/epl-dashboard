@@ -37,6 +37,7 @@ def execute_jdbc_sql(spark: SparkSession, sql: str) -> None:
         conn = driver_mgr.getConnection(POSTGRES_URL, POSTGRES_USER, POSTGRES_PASSWORD)
         stmt = conn.createStatement()
         stmt.executeUpdate(sql)
+        conn.commit()
         stmt.close()
         conn.close()
     except Exception as e:
