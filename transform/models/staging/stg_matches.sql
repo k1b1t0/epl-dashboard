@@ -2,6 +2,15 @@ with source as (
     select * from {{ source('epl_postgres', 'raw_matches') }}
 ),
 
+dedup_source as (
+    select *,
+        row_number() over (
+            partition by id 
+            order by last_updated desc nulls last, _dlt_load_id desc nulls last
+        ) as rn
+    from source
+),
+
 renamed as (
     select
         -- Match Info
@@ -43,7 +52,8 @@ renamed as (
         cast(_dlt_id as varchar) as _dlt_id,
         cast(_dlt_load_id as varchar) as _dlt_load_id
 
-    from source
+    from dedup_source
+    where rn = 1
 )
 
 select * from renamed
