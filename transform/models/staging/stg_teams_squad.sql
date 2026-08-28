@@ -2,15 +2,6 @@ with source as (
     select * from {{ source('epl_postgres', 'raw_teams_squad') }}
 ),
 
-dedup_source as (
-    select *,
-        row_number() over (
-            partition by id, team_id, season 
-            order by _dlt_load_id desc nulls last
-        ) as rn
-    from source
-),
-
 renamed as (
     select
         cast(id as integer) as player_id,
@@ -23,7 +14,7 @@ renamed as (
         cast(_dlt_parent_id as varchar) as team_dlt_id,
         cast(_dlt_list_idx as integer) as _dlt_list_idx,
         cast(_dlt_id as varchar) as _dlt_id
-    from dedup_source
+    from source
     where rn = 1
 )
 
