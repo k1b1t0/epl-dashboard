@@ -35,9 +35,9 @@ def execute_jdbc_sql(spark: SparkSession, sql: str) -> None:
     try:
         driver_mgr = spark._sc._gateway.jvm.java.sql.DriverManager
         conn = driver_mgr.getConnection(POSTGRES_URL, POSTGRES_USER, POSTGRES_PASSWORD)
+        conn.setAutoCommit(True)
         stmt = conn.createStatement()
         stmt.executeUpdate(sql)
-        conn.commit()
         stmt.close()
         conn.close()
     except Exception as e:
