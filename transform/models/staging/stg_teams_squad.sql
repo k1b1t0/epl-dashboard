@@ -15,7 +15,6 @@ renamed as (
         cast(_dlt_list_idx as integer) as _dlt_list_idx,
         cast(_dlt_id as varchar) as _dlt_id
     from source
-    where rn = 1
 )
 
 select * from renamed
