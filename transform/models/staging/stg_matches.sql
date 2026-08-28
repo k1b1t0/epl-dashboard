@@ -41,14 +41,9 @@ renamed as (
         cast(competition__name as varchar) as competition_name,
         cast(competition__code as varchar) as competition_code,
         cast(_dlt_id as varchar) as _dlt_id,
-        cast(_dlt_load_id as varchar) as _dlt_load_id,
+        cast(_dlt_load_id as varchar) as _dlt_load_id
 
-        -- Deduplicate
-        row_number() over (
-            partition by id
-            order by last_updated desc nulls last, _dlt_load_id desc nulls last
-        ) as rn
     from source
 )
 
-select * from renamed where rn = 1
+select * from renamed
