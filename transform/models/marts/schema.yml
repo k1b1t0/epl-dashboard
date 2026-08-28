@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: dim_teams
+    description: "Dimension table of Premier League teams"
+    columns:
+      - name: team_id
+        description: "Primary key for team dimension"
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_team_matches
+    description: "Fact table containing match-level records for each team"
+    columns:
+      - name: team_match_id
+        description: "Primary key for team match fact"
+        tests:
+          - unique
+          - not_null
+      - name: match_id
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: team_id
+        tests:
+          - not_null
+
+  - name: fct_current_standings
+    description: "Fact table containing latest/final league standings"
+    columns:
+      - name: season
+        tests:
+          - not_null
+      - name: rank
+        tests:
+          - not_null
+      - name: team_id
+        tests:
+          - not_null
+
+  - name: fct_matchday_standings
+    description: "Fact table tracking cumulative standings matchday by matchday"
+    columns:
+      - name: season
+        tests:
+          - not_null
+      - name: matchday
+        tests:
+          - not_null
+      - name: team_id
+        tests:
+          - not_null
+      - name: rank
+        tests:
+          - not_null
+
+  - name: fct_history_standings
+    description: "Fact table tracking game-by-game cumulative standings progression"
+    columns:
+      - name: match_id
+        tests:
+          - not_null
+      - name: season
+        tests:
+          - not_null
+      - name: team_id
+        tests:
+          - not_null
+      - name: played
+        tests:
+          - not_null
+      - name: rank
+        tests:
+          - not_null
