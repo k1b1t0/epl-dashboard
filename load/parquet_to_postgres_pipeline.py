@@ -31,19 +31,24 @@ def get_spark_session() -> SparkSession:
         .config("spark.sql.shuffle.partitions", "4") \
         .getOrCreate()
 
-def execute_jdbc_sql(spark: SparkSession, sql: str) -> None:
+import psycopg2
+
+def execute_sql(sql: str) -> None:
     try:
-        jvm = spark._sc._gateway.jvm
-        jvm.java.lang.Class.forName("org.postgresql.Driver")
-        conn = jvm.java.sql.DriverManager.getConnection(POSTGRES_URL, POSTGRES_USER, POSTGRES_PASSWORD)
-        conn.setAutoCommit(True)
-        stmt = conn.createStatement()
-        stmt.executeUpdate(sql)
-        stmt.close()
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD
+        )
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            print(f"Executed SQL: {sql} | Affected rows: {cur.rowcount}")
         conn.close()
     except Exception as e:
-        print(f'JDBC error: {e}')
-        pass
+        print(f"SQL execution error: {e}")
 
 def read_from_postgres(spark: SparkSession, sql: str):
     return spark.read \
@@ -123,8 +128,8 @@ def process_pipeline(spark: SparkSession):
                 ).select(raw_referees["*"]).dropDuplicates(["id", "_dlt_parent_id"])
 
             # Delete -> Append
-            execute_jdbc_sql(spark, f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
-            execute_jdbc_sql(spark, f"DELETE FROM raw_matches WHERE season = {season}")
+            execute_sql(f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
+            execute_sql(f"DELETE FROM raw_matches WHERE season = {season}")
 
             write_to_postgres(target_matches, "raw_matches", mode="append")
             if dedup_referees:
@@ -139,7 +144,7 @@ def process_pipeline(spark: SparkSession):
             team_window = Window.partitionBy("id").orderBy(col("last_updated").desc_nulls_last(), col("_dlt_load_id").desc_nulls_last())
             dedup_season_teams = raw_season_teams.withColumn("rn", row_number().over(team_window)).filter(col("rn") == 1).drop("rn").withColumn("season", lit(season))
 
-            execute_jdbc_sql(spark, f"DELETE FROM raw_teams WHERE season = {season}")
+            execute_sql(f"DELETE FROM raw_teams WHERE season = {season}")
             write_to_postgres(dedup_season_teams, "raw_teams", mode="append")
 
         # 3. Squad
@@ -153,7 +158,7 @@ def process_pipeline(spark: SparkSession):
                 "inner"
             ).drop("parent_id_key").withColumn("season", lit(season))
 
-            execute_jdbc_sql(spark, f"DELETE FROM raw_teams_squad WHERE season = {season}")
+            execute_sql(f"DELETE FROM raw_teams_squad WHERE season = {season}")
             write_to_postgres(season_squad, "raw_teams_squad", mode="append")
 
     print("Finished Load")

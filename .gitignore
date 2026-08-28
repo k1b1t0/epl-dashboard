@@ -21,3 +21,5 @@ load/.ipynb_checkpoints
 
 logs/
 temp*
+
+.agents

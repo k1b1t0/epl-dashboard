@@ -5,7 +5,7 @@ with finished_matches as (
 ),
 
 team_season as (
-    select team_id, season
+    select distinct team_id, season
     from {{ ref('stg_teams') }}
 ),
 
