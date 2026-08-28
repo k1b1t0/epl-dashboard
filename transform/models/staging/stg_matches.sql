@@ -49,6 +49,6 @@ renamed as (
             order by last_updated desc nulls last, _dlt_load_id desc nulls last
         ) as rn
     from source
-),
+)
 
 select * from renamed where rn = 1
