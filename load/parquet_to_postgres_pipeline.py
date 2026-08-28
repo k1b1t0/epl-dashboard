@@ -81,6 +81,8 @@ def process_pipeline(spark: SparkSession):
 
         if matches_full_file.exists():
             print(f"Season {season}: Da chot matches_full.parquet")
+            
+            # Check if there are matches in DWH
             check_matches_existed = read_from_postgres(
                 spark, sql=f"(SELECT COUNT(*) FROM raw_matches WHERE season = {season}) as t"
             )
@@ -119,7 +121,7 @@ def process_pipeline(spark: SparkSession):
                     "inner"
                 ).select(raw_referees["*"]).dropDuplicates(["id", "_dlt_parent_id"])
 
-            # Delete -> Append cho matches va referees
+            # Delete -> Append
             execute_jdbc_sql(spark, f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
             execute_jdbc_sql(spark, f"DELETE FROM raw_matches WHERE season = {season}")
 

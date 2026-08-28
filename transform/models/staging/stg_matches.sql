@@ -43,7 +43,12 @@ renamed as (
         cast(_dlt_id as varchar) as _dlt_id,
         cast(_dlt_load_id as varchar) as _dlt_load_id
 
+        -- Deduplicate
+        row_number() over (
+            partition by match_id
+            order by last_updated desc nulls last, _dlt_load_id desc nulls last
+        ) as rn
     from source
-)
+),
 
-select * from renamed
+select * from renamed where rn = 1
