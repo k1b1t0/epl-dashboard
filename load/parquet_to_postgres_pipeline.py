@@ -39,7 +39,8 @@ def execute_jdbc_sql(spark: SparkSession, sql: str) -> None:
         stmt.executeUpdate(sql)
         stmt.close()
         conn.close()
-    except Exception:
+    except Exception as e:
+        print(f'JDBC error: {e}')
         pass
 
 def read_from_postgres(spark: SparkSession, sql: str):
