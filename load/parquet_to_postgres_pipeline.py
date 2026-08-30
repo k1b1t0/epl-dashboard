@@ -81,7 +81,7 @@ def process_pipeline(spark: SparkSession):
 
         print(f"Season {season}")
 
-        # 1. Matches & Referees
+        
         matches_full_file = season_dir / "matches_full.parquet"
         target_matches = None
 
@@ -96,6 +96,9 @@ def process_pipeline(spark: SparkSession):
             if count_val == 0:
                 print(f"Season {season}: Postgres trong -> Nap tu matches_full.parquet...")
                 target_matches = spark.read.parquet(str(matches_full_file))
+            else:
+                continue
+        # 1. Matches & Referees
         else:
             match_files = [str(f) for f in season_dir.glob("matches_*.parquet")
                            if "referees" not in f.name and "full" not in f.name]
