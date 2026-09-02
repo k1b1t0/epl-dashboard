@@ -71,6 +71,66 @@ def write_to_postgres(df, table_name: str, mode: str = "append") -> None:
         .mode(mode) \
         .save()
 
+def load_matches(spark, season, matches_full_file, season_dir, target_matches):
+    match_files = [str(f) for f in season_dir.glob("matches_*.parquet")
+                    if "referees" not in f.name and "full" not in f.name]
+    
+    if match_files and target_matches is None:
+        print(f"Season {season}: Progress {len(match_files)} match files")
+        raw_matches = spark.read.parquet(*match_files)
+        match_window = Window.partitionBy("id").orderBy(
+            col("last_updated").desc_nulls_last(),
+            col("_dlt_load_id").desc_nulls_last()
+        )
+
+        target_matches = raw_matches \
+            .withColumn("rn", row_number().over(match_window)) \
+            .filter(col("rn") == 1) \
+            .drop("rn")
+
+    if target_matches is not None:
+        execute_sql(f"DELETE FROM raw_matches WHERE season = {season}")
+        write_to_postgres(target_matches, "raw_matches", mode="append")
+
+        total = target_matches.count()
+        unfinished = target_matches.filter(col("status") != "FINISHED").count()
+        if total == 380 and unfinished == 0:
+            
+            print(f"Season {season}: season finished, saved to finished file")
+
+            target_matches.toPandas().to_parquet(matches_full_file, index=False)
+
+def load_teams_and_squad(spark, season, season_dir):
+    team_files = [str(f) for f in season_dir.glob("teams_*.parquet") if "squad" not in f.name]
+    if team_files:
+        print(f"Season {season}: Process teams...")
+        raw_season_teams = spark.read.parquet(*team_files)
+        team_window = Window.partitionBy("id").orderBy(
+            col("last_updated").desc_nulls_last(), 
+            col("_dlt_load_id").desc_nulls_last()
+        )
+        dedup_season_teams = raw_season_teams.withColumn("rn", row_number() \
+            .over(team_window)) \
+            .filter(col("rn") == 1) \
+            .drop("rn") \
+            .withColumn("season", lit(season))
+
+        execute_sql(f"DELETE FROM raw_teams WHERE season = {season}")
+        write_to_postgres(dedup_season_teams, "raw_teams", mode="append")
+
+    squad_files = [str(f) for f in season_dir.glob("teams__squad_*.parquet")]
+    if squad_files and dedup_season_teams:
+        print(f"Season {season}: Process squad...")
+        raw_squad = spark.read.parquet(*squad_files)
+        season_squad = raw_squad.join(
+            dedup_season_teams.select(col("_dlt_id").alias("parent_id_key"), col("id").alias("team_id")),
+            raw_squad._dlt_parent_id == col("parent_id_key"),
+            "inner"
+        ).drop("parent_id_key").withColumn("season", lit(season))
+
+        execute_sql(f"DELETE FROM raw_teams_squad WHERE season = {season}")
+        write_to_postgres(season_squad, "raw_teams_squad", mode="append")
+
 def process_pipeline(spark: SparkSession):
     print("Start Load")
 
@@ -82,87 +142,28 @@ def process_pipeline(spark: SparkSession):
         print(f"Season {season}")
 
         
-        matches_full_file = season_dir / "matches_full.parquet"
+        matches_full_file = season_dir / f"matches_full_{season}.parquet"
         target_matches = None
 
         if matches_full_file.exists():
-            print(f"Season {season}: Da chot matches_full.parquet")
-            
-            # Check if there are matches in DWH
+            print(f"Season {season} finsihed")
+
+            # Check DWH
             check_matches_existed = read_from_postgres(
                 spark, sql=f"(SELECT COUNT(*) FROM raw_matches WHERE season = {season}) as t"
             )
             count_val = check_matches_existed.first()[0]
-            if count_val == 0:
-                print(f"Season {season}: Postgres trong -> Nap tu matches_full.parquet...")
-                target_matches = spark.read.parquet(str(matches_full_file))
-            else:
+
+            if count_val != 0:
                 continue
-        # 1. Matches & Referees
-        else:
-            match_files = [str(f) for f in season_dir.glob("matches_*.parquet")
-                           if "referees" not in f.name and "full" not in f.name]
-            if match_files:
-                print(f"Season {season}: Process {len(match_files)} matches snapshot files...")
-                raw_matches = spark.read.parquet(*match_files)
-                match_window = Window.partitionBy("id").orderBy(
-                    col("last_updated").desc_nulls_last(), 
-                    col("_dlt_load_id").desc_nulls_last()
-                )
-                target_matches = raw_matches.withColumn("rn", row_number().over(match_window)).filter(col("rn") == 1).drop("rn")
+            else:
+                target_matches = spark.read.parquet(str(matches_full_file))
 
-                # Chot matches_full neu tat ca tran da FINISHED
-                total = target_matches.count()
-                unfinished = target_matches.filter(col("status") != "FINISHED").count()
-                if total > 0 and unfinished == 0:
-                    print(f"Season {season}: Tat ca {total} tran FINISHED -> Chot matches_full.parquet")
-                    target_matches.coalesce(1).write.mode("overwrite").parquet(str(matches_full_file))
+        # Matches
+        load_matches(spark, season, matches_full_file, season_dir, target_matches)
 
-        # Thuc hien Delete -> Append dung 1 noi duy nhat neu co target_matches
-        if target_matches is not None:
-            referee_files = [str(f) for f in season_dir.glob("matches__referees_*.parquet")]
-            dedup_referees = None
-            if referee_files:
-                raw_referees = spark.read.parquet(*referee_files)
-                dedup_referees = raw_referees.join(
-                    target_matches.select("_dlt_id"),
-                    raw_referees._dlt_parent_id == target_matches._dlt_id,
-                    "inner"
-                ).select(raw_referees["*"]).dropDuplicates(["id", "_dlt_parent_id"])
-
-            # Delete -> Append
-            execute_sql(f"DELETE FROM raw_matches_referees WHERE _dlt_parent_id IN (SELECT _dlt_id FROM raw_matches WHERE season = {season})")
-            execute_sql(f"DELETE FROM raw_matches WHERE season = {season}")
-
-            write_to_postgres(target_matches, "raw_matches", mode="append")
-            if dedup_referees:
-                write_to_postgres(dedup_referees, "raw_matches_referees", mode="append")
-
-        # 2. Teams
-        team_files = [str(f) for f in season_dir.glob("teams_*.parquet") if "squad" not in f.name]
-        dedup_season_teams = None
-        if team_files:
-            print(f"Season {season}: Process teams...")
-            raw_season_teams = spark.read.parquet(*team_files)
-            team_window = Window.partitionBy("id").orderBy(col("last_updated").desc_nulls_last(), col("_dlt_load_id").desc_nulls_last())
-            dedup_season_teams = raw_season_teams.withColumn("rn", row_number().over(team_window)).filter(col("rn") == 1).drop("rn").withColumn("season", lit(season))
-
-            execute_sql(f"DELETE FROM raw_teams WHERE season = {season}")
-            write_to_postgres(dedup_season_teams, "raw_teams", mode="append")
-
-        # 3. Squad
-        squad_files = [str(f) for f in season_dir.glob("teams__squad_*.parquet")]
-        if squad_files and dedup_season_teams:
-            print(f"Season {season}: Process squad...")
-            raw_squad = spark.read.parquet(*squad_files)
-            season_squad = raw_squad.join(
-                dedup_season_teams.select(col("_dlt_id").alias("parent_id_key"), col("id").alias("team_id")),
-                raw_squad._dlt_parent_id == col("parent_id_key"),
-                "inner"
-            ).drop("parent_id_key").withColumn("season", lit(season))
-
-            execute_sql(f"DELETE FROM raw_teams_squad WHERE season = {season}")
-            write_to_postgres(season_squad, "raw_teams_squad", mode="append")
+        # Teams & Squads
+        load_teams_and_squad(spark, season, season_dir)
 
     print("Finished Load")
 
