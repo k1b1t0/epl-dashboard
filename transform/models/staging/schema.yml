@@ -18,22 +18,6 @@ models:
         tests:
           - not_null
 
-  - name: stg_matches_referees
-    description: "Bang staging danh sach trong tai bat cac tran dau"
-    columns:
-      - name: referee_id
-        description: "Ma dinh danh trong tai"
-        tests:
-          - not_null
-      - name: referee_name
-        description: "Ten trong tai"
-        tests:
-          - not_null
-      - name: match_dlt_id
-        description: "Foreign key ket noi den bang matches (_dlt_id)"
-        tests:
-          - not_null
-
   - name: stg_teams
     description: "Bang staging thong tin cac doi bong EPL theo mua"
     columns:

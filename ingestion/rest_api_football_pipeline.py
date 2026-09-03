@@ -46,6 +46,12 @@ def create_match_filter(season: int):
         match.pop("season", None)
         match["season"] = season
 
+        if match.get("referees"):
+            match["referee_id"] = match["referees"][0].get("id")
+            match["referee_name"] = match["referees"][0].get("name")
+
+        match.pop("referees", None)
+
         match.pop("odds", None)
         return match
     return filter_match_fields
