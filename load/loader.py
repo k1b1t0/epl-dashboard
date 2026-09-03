@@ -46,6 +46,8 @@ def load_teams_and_squad(spark, season, season_dir):
     squad_files = [str(f) for f in season_dir.glob("teams__squad_*.parquet")]
     if squad_files and dedup_season_teams is not None:
         print(f"Season {season}: Process squad...")
+
+        # TODO: Update dedup_latest or 
         raw_squad = spark.read.parquet(*squad_files)
         season_squad = raw_squad.join(
             dedup_season_teams.select(col("_dlt_id").alias("parent_id_key"), col("id").alias("team_id")),

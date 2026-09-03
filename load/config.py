@@ -7,7 +7,9 @@ load_dotenv()
 # Thu muc du lieu raw
 BASE_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
-SEASONS = [2023, 2024, 2025, 2026]
+SEASONS = [
+    int(s.strip()) for s in os.getenv("SEASONS", "2023,2024,2025,2026").split(",") if s.strip()
+]
 
 # Cau hinh Postgres Connection
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
