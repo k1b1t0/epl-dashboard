@@ -22,7 +22,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
 
 # Cac mua giai can cao
-SEASONS = [2023, 2024, 2025, 2026]
+SEASONS = [
+    int(s.strip()) for s in os.getenv("SEASONS", "2023,2024,2025,2026").split(",") if s.strip()
+]
 
 # Loc truong bang teams
 def filter_team_fields(team: dict) -> dict:

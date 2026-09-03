@@ -14,7 +14,9 @@ wheels/
 
 test/
 
-data/
+# Allow full season parquet files, ignore snapshots and temp data
+data/raw/*/*
+!data/raw/*/matches_full_*.parquet
 
 load/*ipynb
 load/.ipynb_checkpoints
